@@ -1,4 +1,4 @@
-.PHONY: all generate clean diagnosis
+.PHONY: all generate clean diagnosis assessment
 
 vocab/diagnosis/diagnoses.json:
 	python src/generate_vocab.py --mode diagnosis
