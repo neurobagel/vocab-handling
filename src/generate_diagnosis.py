@@ -1,3 +1,4 @@
+import argparse
 from pathlib import Path
 import logging
 
@@ -49,7 +50,7 @@ def load_concept_csv(filepath):
     return pd.read_csv(filepath, sep="\t", dtype=str, keep_default_na=False)
 
 
-def filter_diagnosis_terms(df, diagnosis_concept_ids):
+def filter_terms(df, diagnosis_concept_ids):
     log.info("Filtering diagnosis terms")
     return df.query("domain_id == 'Condition' and standard_concept == 'S' and concept_id in @diagnosis_concept_ids")
 
@@ -68,7 +69,7 @@ def save_to_json(df, filepath):
     df.to_json(filepath, orient="records", indent=2)
     
     
-def main(concept_relationship_path, concept_csv_path, graph_path, diagnosis_json_path):
+def main(concept_relationship_path, concept_csv_path, graph_path, out_json_path, mode):
     df_relationships = load_concept_relationships(concept_relationship_path)
     df_concepts = load_concept_csv(concept_csv_path)
     
@@ -78,27 +79,47 @@ def main(concept_relationship_path, concept_csv_path, graph_path, diagnosis_json
         graph = create_graph(df_relationships)
         save_graph(graph, graph_path)
     
-    diagnosis_query = """
-    SELECT ?child
-    WHERE {
-       {?child rdfs:subClassOf* 432586}
-       UNION
-       {?child rdfs:subClassOf* 376106}
-    }
-    """
+    if mode == "diagnosis":
+        query = """
+        SELECT ?child
+        WHERE {
+        {?child rdfs:subClassOf* 432586}
+        UNION
+        {?child rdfs:subClassOf* 376106}
+        }
+        """
+    elif mode == "assessment":
+        query = """
+        SELECT ?child
+        WHERE {
+        ?child rdfs:subClassOf* 4157120 
+        }
+        """
     
-    diagnosis_concept_ids = run_query(graph, diagnosis_query)
-    diagnosis_terms_df = filter_diagnosis_terms(df_concepts, diagnosis_concept_ids)
+    concept_ids = run_query(graph, query)
+    terms_df = filter_terms(df_concepts, concept_ids)
 
-    diagnosis_terms_dict = structure_for_json(diagnosis_terms_df)
-    save_to_json(diagnosis_terms_dict, diagnosis_json_path)
+    terms_dict = structure_for_json(terms_df)
+    save_to_json(terms_dict, out_json_path)
     log.info("Done!")
     
     
 if __name__ == "__main__":
-    file_path = Path(__file__).parent.resolve()
-    concept_relationship_path = file_path / "../data/CONCEPT_RELATIONSHIP.csv"
-    concept_csv_path = file_path / "../data/CONCEPT.csv"
-    graph_path = file_path / "../diagnosis_graph.ttl"
-    diagnosis_json_path = file_path / "../vocab/diagnosis/diagnoses.json"
-    main(concept_relationship_path, concept_csv_path, graph_path, diagnosis_json_path)
+    FILE_PATH = Path(__file__).parent.resolve()
+    
+    parser = argparse.ArgumentParser(description="Generate diagnosis or assessment terms JSON")
+    parser.add_argument("--mode", required=True, choices=["diagnosis", "assessment"], help="Mode to run the script in: 'diagnosis' or 'assessment'")
+
+    args = parser.parse_args()
+    if args.mode == "diagnosis":
+        out_json_path = FILE_PATH / "../vocab/diagnosis/diagnoses.json"
+    elif args.mode == "assessment":
+        out_json_path = FILE_PATH / "../vocab/assessment/assessments.json"
+    else:
+        log.error(f"Invalid mode selected: {args.mode}")
+        exit(1)
+    
+    concept_relationship_path = FILE_PATH / "../data/CONCEPT_RELATIONSHIP.csv"
+    concept_csv_path = FILE_PATH / "../data/CONCEPT.csv"
+    graph_path = FILE_PATH / "../snomed_graph.ttl"
+    main(concept_relationship_path, concept_csv_path, graph_path, out_json_path, args.mode)
