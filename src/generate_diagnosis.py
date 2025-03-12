@@ -12,12 +12,13 @@ log = logging.getLogger("generate_diagnosis")
 
 
 def load_concept_relationships(filepath):
+    """Load concept relationships and filter for direct hierarchical relationships"""
     log.info(f"Loading the {filepath}")
     df = pd.read_csv(filepath, sep='\t', usecols=['concept_id_1', 'concept_id_2', 'relationship_id'])
     return df[df['relationship_id'] == "Is a"]
 
-
 def create_graph(df):
+    """Save the parent-child relationships as triples to an rdflib Graph object to query over"""
     log.info("Creating the graph")
     graph = Graph()
     for index, row in tqdm.tqdm(df.iterrows(), total=df.shape[0], desc="Creating graph"):
@@ -26,8 +27,8 @@ def create_graph(df):
         graph.add((Literal(concept_id_1), RDFS.subClassOf, Literal(concept_id_2)))
     return graph
 
-
 def save_graph(graph, filepath):
+    """Save the graph into a .ttl file so we don't have to rebuild it next time"""
     log.info(f"Saving the graph to {filepath}")
     graph.serialize(format="turtle", destination=filepath)
     
@@ -40,12 +41,14 @@ def load_graph(filepath):
 
 
 def run_query(graph, query):
+    """Return ATHENA concept_ids for terms matching a query"""
     log.info("Running the query")
     query_results = graph.query(query)
     return [str(res[0]) for res in query_results]
 
 
 def load_concept_csv(filepath):
+    """Load table for mapping an (Athena) concept_id to concept_code (equivalent to BioPortal term ID)"""
     log.info("Loading the CONCEPT.csv")
     return pd.read_csv(filepath, sep="\t", dtype=str, keep_default_na=False)
 
