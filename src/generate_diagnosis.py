@@ -121,6 +121,9 @@ if __name__ == "__main__":
     else:
         log.error(f"Invalid mode selected: {args.mode}")
         exit(1)
+        
+    if not out_json_path.parent.is_dir():
+        out_json_path.parent.mkdir(parents=True)
     
     concept_relationship_path = FILE_PATH / "../data/CONCEPT_RELATIONSHIP.csv"
     concept_csv_path = FILE_PATH / "../data/CONCEPT.csv"
