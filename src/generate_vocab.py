@@ -54,7 +54,7 @@ def load_concept_csv(filepath):
 
 
 def filter_terms(df, concept_ids, domain_id=None):
-    log.info("Filtering diagnosis terms")
+    log.info("Filtering terms")
     domain_filter = "domain_id == 'Condition' and " if domain_id else ""
     return df.query(f"{domain_filter} standard_concept == 'S' and concept_id in @concept_ids")
 
