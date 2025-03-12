@@ -65,7 +65,7 @@ def structure_for_json(df):
 
 def save_to_json(df, filepath):
     log.info(f"Saving to JSON file {filepath}")
-    df.to_json(filepath, orient="records")
+    df.to_json(filepath, orient="records", indent=2)
     
     
 def main(concept_relationship_path, concept_csv_path, graph_path, diagnosis_json_path):
