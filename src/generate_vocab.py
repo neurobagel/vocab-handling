@@ -8,7 +8,7 @@ import tqdm
 
 
 logging.basicConfig(level=logging.INFO)
-log = logging.getLogger("generate_diagnosis")
+log = logging.getLogger("generate_vocab")
 
 
 def load_concept_relationships(filepath):
@@ -53,9 +53,10 @@ def load_concept_csv(filepath):
     return pd.read_csv(filepath, sep="\t", dtype=str, keep_default_na=False)
 
 
-def filter_terms(df, diagnosis_concept_ids):
+def filter_terms(df, concept_ids, domain_id=None):
     log.info("Filtering diagnosis terms")
-    return df.query("domain_id == 'Condition' and standard_concept == 'S' and concept_id in @diagnosis_concept_ids")
+    domain_filter = "domain_id == 'Condition' and " if domain_id else ""
+    return df.query(f"{domain_filter} standard_concept == 'S' and concept_id in @concept_ids")
 
 
 def structure_for_json(df):
@@ -100,7 +101,7 @@ def main(concept_relationship_path, concept_csv_path, graph_path, out_json_path,
         """
     
     concept_ids = run_query(graph, query)
-    terms_df = filter_terms(df_concepts, concept_ids)
+    terms_df = filter_terms(df_concepts, concept_ids,  domain_id="Condition" if mode == "diagnosis" else None)
 
     terms_dict = structure_for_json(terms_df)
     save_to_json(terms_dict, out_json_path)
