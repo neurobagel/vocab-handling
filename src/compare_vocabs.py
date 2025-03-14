@@ -22,7 +22,7 @@ def save_json(data: dict, path: Path):
         json.dump(data, f, indent=2)
 
 
-def load_concept_csv(filepath) -> pd.DataFrame:
+def load_concept_csv(filepath: Path) -> pd.DataFrame:
     """Load Athena concept table as a DataFrame"""
     return pd.read_csv(filepath, sep="\t", dtype=str, keep_default_na=False)
     
@@ -35,7 +35,7 @@ def get_diff_terms(old_terms: dict, new_terms: dict) -> tuple[list[dict]]:
     return old_terms_unique, new_terms_unique
 
 
-def get_diff_terms_as_table(diff_terms) -> pd.DataFrame:
+def get_diff_terms_as_table(diff_terms: list[dict]) -> pd.DataFrame:
     """Return a DataFrame of the different terms with additional info about concept validity."""
     df = pd.DataFrame(diff_terms)
     # strip snomed: from the identifiers
@@ -50,7 +50,7 @@ def get_diff_terms_as_table(diff_terms) -> pd.DataFrame:
     return df_validity_info
 
 
-def get_duplicates(new_terms) -> dict:
+def get_duplicates(new_terms: list[dict]) -> dict:
     """Return a dict of label duplicates in the new terms, with values being the number of occurrences."""
     terms_dict = {
         term["identifier"]: term["label"] for term in new_terms
@@ -60,9 +60,7 @@ def get_duplicates(new_terms) -> dict:
     return label_duplicates
 
 
-def main():
-    vocab_dir = Path(__file__).parents[1] / "vocab"
-    print(vocab_dir)
+def main(vocab_dir: Path):
     # This assumes there is only one vocabulary JSON file per directory!
     old_terms = load_json(next((vocab_dir / "old").glob("*.json")))
     new_terms = load_json(next((vocab_dir / "new").glob("*.json")))
@@ -85,4 +83,6 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    VOCAB_DIR = Path(__file__).parents[1] / "vocab"
+
+    main(vocab_dir=VOCAB_DIR)
