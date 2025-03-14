@@ -56,7 +56,12 @@ def load_concept_csv(filepath):
 def filter_terms(df, concept_ids, domain_id=None):
     log.info("Filtering terms")
     domain_filter = "domain_id == 'Condition' and " if domain_id else ""
-    return df.query(f"{domain_filter} standard_concept == 'S' and concept_id in @concept_ids")
+    # NOTE: The invalid_reason filter technically is unnecessary here since invalid concepts cannot be standard,
+    # in OHDSI, but we include it here for reference.
+    # See also https://ohdsi.github.io/TheBookOfOhdsi/StandardizedVocabularies.html#conceptLifeCycle
+    return df.query(
+        f"{domain_filter} standard_concept == 'S' and invalid_reason == '' and concept_id in @concept_ids"
+    )
 
 
 def structure_for_json(df):
