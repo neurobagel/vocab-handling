@@ -27,6 +27,16 @@ make assessments
 make all
 ```
 
+### If specific terms need to be added/included
+
+You can run `generate_vocab.py` directly and pass the path to a TSV containing specific terms using the optional `--add-terms` argument, e.g.:
+
+```bash
+python generate_vocab.py --mode diagnosis --add-terms ./openneuro_diagnoses.tsv
+```
+
+(See `python generate_vocab.py --help` for TSV details)
+
 ## To compare the old and new version of a vocabulary term list
 
 1. Create the following subdirectories:
