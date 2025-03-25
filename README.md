@@ -39,12 +39,6 @@ python generate_vocab.py --mode diagnosis --add-terms ./openneuro_diagnoses.tsv
 
 ## To compare the old and new version of a vocabulary term list
 
-1. Create the following subdirectories:
-   ```bash
-   mkdir vocab/old vocab/new
-   ```
-2. Copy your old and new vocabulary list .json file into the appropriate subdirectory.
-3. Run:
-   ```bash
-   python src/compare_vocabs.py
-   ```
+```bash
+python src/compare_vocabs.py --old-terms PATH/TO/OLD/VOCAB/JSON --new-terms PATH/TO/NEW/VOCAB/JSON
+```

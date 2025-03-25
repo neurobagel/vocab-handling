@@ -8,6 +8,7 @@ import json
 from pathlib import Path
 import pandas as pd
 from collections import Counter
+import argparse
 
 
 def load_json(path: Path):
@@ -25,7 +26,12 @@ def save_json(data: dict, path: Path):
 def load_concept_csv(filepath: Path) -> pd.DataFrame:
     """Load Athena concept table as a DataFrame"""
     return pd.read_csv(filepath, sep="\t", dtype=str, keep_default_na=False)
-    
+
+
+def count_terms(terms: dict) -> int:
+    """Print the number of terms in the terms JSON"""
+    return len(terms)
+
 
 def get_diff_terms(old_terms: dict, new_terms: dict) -> tuple[list[dict]]:
     old_terms_unique = [term for term in old_terms if term not in new_terms]
@@ -60,10 +66,12 @@ def get_duplicates(new_terms: list[dict]) -> dict:
     return label_duplicates
 
 
-def main(vocab_dir: Path):
-    # This assumes there is only one vocabulary JSON file per directory!
-    old_terms = load_json(next((vocab_dir / "old").glob("*.json")))
-    new_terms = load_json(next((vocab_dir / "new").glob("*.json")))
+def main(vocab_dir: Path, old_terms_path: Path, new_terms_path: Path):
+    old_terms = load_json(old_terms_path)
+    new_terms = load_json(new_terms_path)
+    
+    print("Number of terms in the old terms list: ", count_terms(old_terms))
+    print("Number of terms in the new terms list: ", count_terms(new_terms))
 
     old_terms_unique, new_terms_unique = get_diff_terms(old_terms, new_terms)
     old_terms_unique_df = get_diff_terms_as_table(old_terms_unique)
@@ -83,6 +91,11 @@ def main(vocab_dir: Path):
 
 
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="Compare two versions of a list of vocabulary terms")
+    parser.add_argument("--old-terms", required=True, help="Path to the old vocabulary JSON file")
+    parser.add_argument("--new-terms", required=True, help="Path to the new vocabulary JSON file")
+
+    args = parser.parse_args()
     VOCAB_DIR = Path(__file__).parents[1] / "vocab"
 
-    main(vocab_dir=VOCAB_DIR)
+    main(vocab_dir=VOCAB_DIR, old_terms_path=Path(args.old_terms), new_terms_path=Path(args.new_terms))
