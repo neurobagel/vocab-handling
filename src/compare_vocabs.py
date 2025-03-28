@@ -28,11 +28,6 @@ def load_concept_csv(filepath: Path) -> pd.DataFrame:
     return pd.read_csv(filepath, sep="\t", dtype=str, keep_default_na=False)
 
 
-def count_terms(terms: dict) -> int:
-    """Print the number of terms in the terms JSON"""
-    return len(terms)
-
-
 def get_diff_terms(old_terms: dict, new_terms: dict) -> tuple[list[dict]]:
     old_terms_unique = [term for term in old_terms if term not in new_terms]
     new_terms_unique = [term for term in new_terms if term not in old_terms]
@@ -66,36 +61,38 @@ def get_duplicates(new_terms: list[dict]) -> dict:
     return label_duplicates
 
 
-def main(vocab_dir: Path, old_terms_path: Path, new_terms_path: Path):
+def main(old_terms_path: Path, new_terms_path: Path, output_dir: Path):
     old_terms = load_json(old_terms_path)
     new_terms = load_json(new_terms_path)
     
-    print("Number of terms in the old terms list: ", count_terms(old_terms))
-    print("Number of terms in the new terms list: ", count_terms(new_terms))
+    print("Number of terms in the old terms list: ", len(old_terms))
+    print("Number of terms in the new terms list: ", len(new_terms))
 
     old_terms_unique, new_terms_unique = get_diff_terms(old_terms, new_terms)
     old_terms_unique_df = get_diff_terms_as_table(old_terms_unique)
     new_term_duplicates = get_duplicates(new_terms)
 
     if old_terms_unique:
-        save_json(old_terms_unique, vocab_dir / "old_terms_unique.json")
+        save_json(old_terms_unique, output_dir / "old_terms_unique.json")
         old_terms_unique_df.to_csv(
-            vocab_dir / "old_terms_unique.tsv", sep="\t", index=False
+            output_dir / "old_terms_unique.tsv", sep="\t", index=False
         )
 
     if new_terms_unique:
-        save_json(new_terms_unique, vocab_dir / "new_terms_unique.json")
+        save_json(new_terms_unique, output_dir / "new_terms_unique.json")
 
     if new_term_duplicates:
-        save_json(new_term_duplicates, vocab_dir / "new_term_duplicates.json")
+        save_json(new_term_duplicates, output_dir / "new_term_duplicates.json")
 
 
 if __name__ == "__main__":
+    VOCAB_DIR = Path(__file__).parents[1] / "vocab"
+
     parser = argparse.ArgumentParser(description="Compare two versions of a list of vocabulary terms")
     parser.add_argument("--old-terms", required=True, help="Path to the old vocabulary JSON file")
     parser.add_argument("--new-terms", required=True, help="Path to the new vocabulary JSON file")
+    parser.add_argument("--output-dir", default=VOCAB_DIR, help="Directory for comparison output files.")
 
     args = parser.parse_args()
-    VOCAB_DIR = Path(__file__).parents[1] / "vocab"
 
-    main(vocab_dir=VOCAB_DIR, old_terms_path=Path(args.old_terms), new_terms_path=Path(args.new_terms))
+    main(old_terms_path=Path(args.old_terms), new_terms_path=Path(args.new_terms), output_dir=Path(args.output_dir))
