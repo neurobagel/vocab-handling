@@ -2,6 +2,7 @@ import argparse
 from pathlib import Path
 import logging
 import json
+from copy import deepcopy
 
 import pandas as pd
 from rdflib import Graph, RDFS, Literal
@@ -117,14 +118,18 @@ def structure_for_json(df, preamble, add_extension=None):
     df = df[['concept_code', 'concept_name']]
     df = df.rename(columns={'concept_code': 'id', 'concept_name': 'name'})
     df = df.reset_index(drop=True)
-    df['id'] = 'snomed:' + df['id'].astype(str)
 
-    out_json = [preamble]
-    out_json[0]['terms'] = df.to_dict('records')
+    namespace_prefix = preamble["namespace_prefix"]
+    df['id'] = namespace_prefix + ':' + df['id'].astype(str)
+
+    vocabulary = deepcopy(preamble)
+    vocabulary['terms'] = df.to_dict('records')
+
+    out_json = [vocabulary]
 
     if add_extension:
         log.info(f"Adding vocab extension")
-        out_json.insert(0, add_extension)
+        out_json.insert(0, deepcopy(add_extension))
 
     return out_json
 
