@@ -10,6 +10,12 @@ import tqdm
 logging.basicConfig(level=logging.INFO)
 log = logging.getLogger("generate_vocab")
 
+# Athena concept IDs for parent concepts
+# We will only include child terms of these.
+# Attention: these are the Athena codes, not the SNOMED codes - , 435524
+DIAGNOSIS_PARENT_CONCEPTS = [432586, 376106]
+ASSESSMENT_PARENT_CONCEPTS = [4157120]
+
 
 def load_concept_relationships(filepath):
     """Load concept relationships and filter for direct hierarchical relationships"""
@@ -47,6 +53,22 @@ def run_query(graph, query):
     return [str(res[0]) for res in query_results]
 
 
+def build_descendants_query(parent_concept_ids):
+    """Build a SPARQL query that selects all descendants of one or more parent concepts.
+
+    Uses rdfs:subClassOf* to include the parent concept itself and all transitive children.
+    """
+    union_blocks = "\n        UNION\n".join(
+        f"        {{?child rdfs:subClassOf* {parent_id}}}" for parent_id in parent_concept_ids
+    )
+    return f"""
+    SELECT ?child
+    WHERE {{
+{union_blocks}
+    }}
+    """
+
+
 def load_concept_csv(filepath):
     """Load table for mapping an (Athena) concept_id to concept_code (equivalent to BioPortal term ID)"""
     log.info("Loading the CONCEPT.csv")
@@ -75,9 +97,9 @@ def structure_for_json(df, add_terms_path):
         # In case any of the term IDs to be added are already in the dataframe, we remove them
         df.drop_duplicates(subset="concept_code", keep="first", inplace=True, ignore_index=True)
 
-    df = df.rename(columns={'concept_code': 'identifier', 'concept_name': 'label'})
+    df = df.rename(columns={'concept_code': 'id', 'concept_name': 'name'})
     df = df.reset_index(drop=True)
-    df['identifier'] = 'snomed:' + df['identifier'].astype(str)
+    df['id'] = 'snomed:' + df['id'].astype(str)
     return df
 
 
@@ -97,22 +119,14 @@ def main(concept_relationship_path, concept_csv_path, graph_path, out_json_path,
         save_graph(graph, graph_path)
     
     if mode == "diagnosis":
-        query = """
-        SELECT ?child
-        WHERE {
-        {?child rdfs:subClassOf* 432586}
-        UNION
-        {?child rdfs:subClassOf* 376106}
-        }
-        """
+        parent_concepts = DIAGNOSIS_PARENT_CONCEPTS
     elif mode == "assessment":
-        query = """
-        SELECT ?child
-        WHERE {
-        ?child rdfs:subClassOf* 4157120 
-        }
-        """
-    
+        parent_concepts = ASSESSMENT_PARENT_CONCEPTS
+    else:
+        log.error(f"Invalid mode selected: {mode}")
+        exit(1)
+
+    query = build_descendants_query(parent_concepts)
     concept_ids = run_query(graph, query)
     terms_df = filter_terms(df_concepts, concept_ids,  domain_id="Condition" if mode == "diagnosis" else None)
 
@@ -126,7 +140,7 @@ if __name__ == "__main__":
     
     parser = argparse.ArgumentParser(description="Generate diagnosis or assessment terms JSON")
     parser.add_argument("--mode", required=True, choices=["diagnosis", "assessment"], help="Mode to run the script in: 'diagnosis' or 'assessment'")
-    parser.add_argument("--add-terms", metavar="TERMS_TSV_PATH", help="Path to a TSV containing specific terms to include in the vocabulary. Should have two columns 'concept_code' (BioPortal ID only) and 'concept_name' (label).")
+    parser.add_argument("--add-terms", metavar="TERMS_TSV_PATH", help="Path to a TSV containing specific terms to include in the vocabulary. Should have two columns 'concept_code' (BioPortal ID only) and 'concept_name' (name).")
 
     args = parser.parse_args()
     if args.mode == "diagnosis":
