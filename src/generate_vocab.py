@@ -1,6 +1,7 @@
 import argparse
 from pathlib import Path
 import logging
+import json
 
 import pandas as pd
 from rdflib import Graph, RDFS, Literal
@@ -15,6 +16,31 @@ log = logging.getLogger("generate_vocab")
 # Attention: these are the Athena codes, not the SNOMED codes - , 435524
 DIAGNOSIS_PARENT_CONCEPTS = [432586, 376106]
 ASSESSMENT_PARENT_CONCEPTS = [4157120]
+# Preamble for the vocabularies
+DIAGNOSIS_PREAMBLE = {
+    "namespace_prefix": "snomed",
+    "namespace_url": "http://purl.bioontology.org/ontology/SNOMEDCT/",
+    "vocabulary_name": "Neurobagel vocabulary of Disorder terms",
+    "version": "1.0.0",
+}
+DIAGNOSIS_EXTENSION = {
+    "namespace_prefix": "ncit",
+    "namespace_url": "http://ncicb.nci.nih.gov/xml/owl/EVS/Thesaurus.owl#",
+    "vocabulary_name": "Neurobagel vocabulary of Disorder terms",
+    "version": "1.0.0",
+    "terms": [
+      {
+        "name": "Healthy Control",
+        "id": "C94342"
+      }
+    ]
+  }
+ASSESSMENT_PREAMBLE = {
+    "namespace_prefix": "snomed",
+    "namespace_url": "http://purl.bioontology.org/ontology/SNOMEDCT/",
+    "vocabulary_name": "Neurobagel vocabulary of Assessment terms",
+    "version": "1.0.0",
+}
 
 
 def load_concept_relationships(filepath):
@@ -86,29 +112,30 @@ def filter_terms(df, concept_ids, domain_id=None):
     )
 
 
-def structure_for_json(df, add_terms_path):
+def structure_for_json(df, preamble, add_extension=None):
     log.info("Structuring dataframe for JSON output")
     df = df[['concept_code', 'concept_name']]
-
-    if add_terms_path:
-        log.info(f"Loading additional terms to include from {str(add_terms_path)}")
-        add_terms_df = pd.read_csv(add_terms_path, sep='\t', dtype=str)
-        df.append(add_terms_df, ignore_index=True)
-        # In case any of the term IDs to be added are already in the dataframe, we remove them
-        df.drop_duplicates(subset="concept_code", keep="first", inplace=True, ignore_index=True)
-
     df = df.rename(columns={'concept_code': 'id', 'concept_name': 'name'})
     df = df.reset_index(drop=True)
     df['id'] = 'snomed:' + df['id'].astype(str)
-    return df
+
+    out_json = [preamble]
+    out_json[0]['terms'] = df.to_dict('records')
+
+    if add_extension:
+        log.info(f"Adding vocab extension")
+        out_json.insert(0, add_extension)
+
+    return out_json
 
 
 def save_to_json(df, filepath):
     log.info(f"Saving to JSON file {filepath}")
-    df.to_json(filepath, orient="records", indent=2)
+    with open(filepath, 'w') as f:
+        f.write(json.dumps(df, indent=2))
     
     
-def main(concept_relationship_path, concept_csv_path, graph_path, out_json_path, mode, add_terms_path):
+def main(concept_relationship_path, concept_csv_path, graph_path, out_json_path, mode):
     df_relationships = load_concept_relationships(concept_relationship_path)
     df_concepts = load_concept_csv(concept_csv_path)
     
@@ -120,8 +147,10 @@ def main(concept_relationship_path, concept_csv_path, graph_path, out_json_path,
     
     if mode == "diagnosis":
         parent_concepts = DIAGNOSIS_PARENT_CONCEPTS
+        preamble = DIAGNOSIS_PREAMBLE
     elif mode == "assessment":
         parent_concepts = ASSESSMENT_PARENT_CONCEPTS
+        preamble = ASSESSMENT_PREAMBLE
     else:
         log.error(f"Invalid mode selected: {mode}")
         exit(1)
@@ -130,7 +159,7 @@ def main(concept_relationship_path, concept_csv_path, graph_path, out_json_path,
     concept_ids = run_query(graph, query)
     terms_df = filter_terms(df_concepts, concept_ids,  domain_id="Condition" if mode == "diagnosis" else None)
 
-    terms_dict = structure_for_json(terms_df, add_terms_path)
+    terms_dict = structure_for_json(terms_df, preamble, DIAGNOSIS_EXTENSION if mode == "diagnosis" else None)
     save_to_json(terms_dict, out_json_path)
     log.info("Done!")
     
@@ -140,7 +169,6 @@ if __name__ == "__main__":
     
     parser = argparse.ArgumentParser(description="Generate diagnosis or assessment terms JSON")
     parser.add_argument("--mode", required=True, choices=["diagnosis", "assessment"], help="Mode to run the script in: 'diagnosis' or 'assessment'")
-    parser.add_argument("--add-terms", metavar="TERMS_TSV_PATH", help="Path to a TSV containing specific terms to include in the vocabulary. Should have two columns 'concept_code' (BioPortal ID only) and 'concept_name' (name).")
 
     args = parser.parse_args()
     if args.mode == "diagnosis":
@@ -157,6 +185,5 @@ if __name__ == "__main__":
     concept_relationship_path = FILE_PATH / "../data/CONCEPT_RELATIONSHIP.csv"
     concept_csv_path = FILE_PATH / "../data/CONCEPT.csv"
     graph_path = FILE_PATH / "../snomed_graph.ttl"
-    add_terms_path = Path(args.add_terms) if args.add_terms else None
 
-    main(concept_relationship_path, concept_csv_path, graph_path, out_json_path, args.mode, add_terms_path)
+    main(concept_relationship_path, concept_csv_path, graph_path, out_json_path, args.mode)
