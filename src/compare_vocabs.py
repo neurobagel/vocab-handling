@@ -41,12 +41,32 @@ def flatten_terms(vocab_data: list[dict]) -> list[dict]:
     return terms
 
 
-def get_diff_terms(old_terms: dict, new_terms: dict) -> tuple[list[dict]]:
-    old_terms_unique = [term for term in old_terms if term not in new_terms]
-    new_terms_unique = [term for term in new_terms if term not in old_terms]
-    print("Number of terms unique to the old terms list: ", len(old_terms_unique))
-    print("Number of terms unique to the new terms list: ", len(new_terms_unique))
-    return old_terms_unique, new_terms_unique
+def get_diff_terms(old_terms: list[dict], new_terms: list[dict]) -> tuple[list[dict], list[dict], list[dict]]:
+    """Classify differences between two flat term lists by ID.
+
+    Returns:
+        deleted: terms whose ID exists only in old_terms (true removals)
+        added:   terms whose ID exists only in new_terms (true additions)
+        renamed: terms whose ID exists in both but with a different name
+    """
+    old_by_id = {term["id"]: term["name"] for term in old_terms}
+    new_by_id = {term["id"]: term["name"] for term in new_terms}
+
+    old_ids = set(old_by_id)
+    new_ids = set(new_by_id)
+
+    deleted = [{"id": id_, "name": old_by_id[id_]} for id_ in sorted(old_ids - new_ids)]
+    added   = [{"id": id_, "name": new_by_id[id_]} for id_ in sorted(new_ids - old_ids)]
+    renamed = [
+        {"id": id_, "old_name": old_by_id[id_], "new_name": new_by_id[id_]}
+        for id_ in sorted(old_ids & new_ids)
+        if old_by_id[id_] != new_by_id[id_]
+    ]
+
+    print(f"Terms only in old (deleted):                   {len(deleted)}")
+    print(f"Terms only in new (added):                     {len(added)}")
+    print(f"Terms in both but with different name (renamed): {len(renamed)}")
+    return deleted, added, renamed
 
 
 def get_diff_terms_as_table(diff_terms: list[dict]) -> pd.DataFrame:
@@ -84,22 +104,23 @@ def get_duplicates(new_terms: list[dict]) -> dict:
 def main(old_terms_path: Path, new_terms_path: Path, output_dir: Path):
     old_terms = flatten_terms(load_json(old_terms_path))
     new_terms = flatten_terms(load_json(new_terms_path))
-    
+
     print("Number of terms in the old terms list: ", len(old_terms))
     print("Number of terms in the new terms list: ", len(new_terms))
 
-    old_terms_unique, new_terms_unique = get_diff_terms(old_terms, new_terms)
-    old_terms_unique_df = get_diff_terms_as_table(old_terms_unique)
+    deleted, added, renamed = get_diff_terms(old_terms, new_terms)
+    deleted_df = get_diff_terms_as_table(deleted)
     new_term_duplicates = get_duplicates(new_terms)
 
-    if old_terms_unique:
-        save_json(old_terms_unique, output_dir / "old_terms_unique.json")
-        old_terms_unique_df.to_csv(
-            output_dir / "old_terms_unique.tsv", sep="\t", index=False
-        )
+    if deleted:
+        save_json(deleted, output_dir / "deleted_terms.json")
+        deleted_df.to_csv(output_dir / "deleted_terms.tsv", sep="\t", index=False)
 
-    if new_terms_unique:
-        save_json(new_terms_unique, output_dir / "new_terms_unique.json")
+    if added:
+        save_json(added, output_dir / "added_terms.json")
+
+    if renamed:
+        save_json(renamed, output_dir / "renamed_terms.json")
 
     if new_term_duplicates:
         save_json(new_term_duplicates, output_dir / "new_term_duplicates.json")
