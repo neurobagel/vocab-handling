@@ -28,6 +28,19 @@ def load_concept_csv(filepath: Path) -> pd.DataFrame:
     return pd.read_csv(filepath, sep="\t", dtype=str, keep_default_na=False)
 
 
+def flatten_terms(vocab_data: list[dict]) -> list[dict]:
+    """Extract and flatten all terms from a list of vocabulary-group objects.
+
+    generate_vocab.py outputs a list of vocab groups, each with a "terms" key.
+    This helper concatenates all those term lists into a single flat list of
+    {"id": ..., "name": ...} dicts for use by downstream comparison functions.
+    """
+    terms = []
+    for vocab_group in vocab_data:
+        terms.extend(vocab_group.get("terms", []))
+    return terms
+
+
 def get_diff_terms(old_terms: dict, new_terms: dict) -> tuple[list[dict]]:
     old_terms_unique = [term for term in old_terms if term not in new_terms]
     new_terms_unique = [term for term in new_terms if term not in old_terms]
@@ -37,16 +50,23 @@ def get_diff_terms(old_terms: dict, new_terms: dict) -> tuple[list[dict]]:
 
 
 def get_diff_terms_as_table(diff_terms: list[dict]) -> pd.DataFrame:
-    """Return a DataFrame of the different terms with additional info about concept validity."""
+    """Return a DataFrame of the different terms with additional info about concept validity.
+
+    Terms whose IDs have no namespace prefix (e.g. ncit extension terms like "C94342")
+    are included in the output but skipped during the CONCEPT.csv validity lookup since
+    that table only covers SNOMED/Athena concepts.
+    """
     df = pd.DataFrame(diff_terms)
-    # strip snomed: from the identifiers
-    df["concept_code"] = df["identifier"].str.split(":").str[1]
+    # Extract concept_code from prefixed IDs (e.g. "snomed:123456" -> "123456").
+    # Terms without a ":" (e.g. bare ncit IDs) will produce NaN here.
+    df["concept_code"] = df["id"].where(~df["id"].str.contains(":"), other=None)
+    df.loc[df["id"].str.contains(":"), "concept_code"] = df.loc[df["id"].str.contains(":"), "id"].str.split(":").str[1]
 
     concepts = load_concept_csv(Path(__file__).parents[1] / "data/CONCEPT.csv")
     concepts_validity_info = concepts[["concept_code", "valid_end_date", "invalid_reason"]]
 
     df_validity_info = df.merge(concepts_validity_info, on="concept_code", how="left")
-    df.drop(columns=["concept_code"], inplace=True)
+    df_validity_info.drop(columns=["concept_code"], inplace=True)
 
     return df_validity_info
 
@@ -54,16 +74,16 @@ def get_diff_terms_as_table(diff_terms: list[dict]) -> pd.DataFrame:
 def get_duplicates(new_terms: list[dict]) -> dict:
     """Return a dict of label duplicates in the new terms, with values being the number of occurrences."""
     terms_dict = {
-        term["identifier"]: term["label"] for term in new_terms
+        term["id"]: term["name"] for term in new_terms
     }
-    label_duplicates = {label: count for label, count in Counter(terms_dict.values()).items() if count > 1}
-    print("Number of labels with duplicates in the new terms: ", len(label_duplicates))
-    return label_duplicates
+    name_duplicates = {name: count for name, count in Counter(terms_dict.values()).items() if count > 1}
+    print("Number of labels with duplicates in the new terms: ", len(name_duplicates))
+    return name_duplicates
 
 
 def main(old_terms_path: Path, new_terms_path: Path, output_dir: Path):
-    old_terms = load_json(old_terms_path)
-    new_terms = load_json(new_terms_path)
+    old_terms = flatten_terms(load_json(old_terms_path))
+    new_terms = flatten_terms(load_json(new_terms_path))
     
     print("Number of terms in the old terms list: ", len(old_terms))
     print("Number of terms in the new terms list: ", len(new_terms))

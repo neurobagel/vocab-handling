@@ -119,9 +119,6 @@ def structure_for_json(df, preamble, add_extension=None):
     df = df.rename(columns={'concept_code': 'id', 'concept_name': 'name'})
     df = df.reset_index(drop=True)
 
-    namespace_prefix = preamble["namespace_prefix"]
-    df['id'] = namespace_prefix + ':' + df['id'].astype(str)
-
     vocabulary = deepcopy(preamble)
     vocabulary['terms'] = df.to_dict('records')
 
