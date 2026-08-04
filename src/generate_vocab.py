@@ -14,8 +14,8 @@ log = logging.getLogger("generate_vocab")
 
 # Athena concept IDs for parent concepts
 # We will only include child terms of these.
-# Attention: these are the Athena codes, not the SNOMED codes - , 435524
-DIAGNOSIS_PARENT_CONCEPTS = [432586, 376106]
+# Attention: these are the Athena codes, not the SNOMED codes
+DIAGNOSIS_PARENT_CONCEPTS = [432586, 376106, 435524]
 ASSESSMENT_PARENT_CONCEPTS = [4157120]
 # Preamble for the vocabularies
 DIAGNOSIS_PREAMBLE = {
