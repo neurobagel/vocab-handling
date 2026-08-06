@@ -15,7 +15,11 @@ log = logging.getLogger("generate_vocab")
 # Athena concept IDs for parent concepts
 # We will only include child terms of these.
 # Attention: these are the Athena codes, not the SNOMED codes
+# 432586 - "Mental disorder"
+# 376106 - "Disorder of the central nervous system"
+# 435524 - "Sleep disorder"
 DIAGNOSIS_PARENT_CONCEPTS = [432586, 376106, 435524]
+# 4157120 - "Assessment scales"
 ASSESSMENT_PARENT_CONCEPTS = [4157120]
 # Preamble for the vocabularies
 DIAGNOSIS_PREAMBLE = {
@@ -113,7 +117,7 @@ def filter_terms(df, concept_ids, domain_id=None):
     )
 
 
-def structure_for_json(df, preamble, add_extension=None):
+def structure_for_json(df: pd.DataFrame, preamble: dict, add_extension: dict | None =None):
     log.info("Structuring dataframe for JSON output")
     df = df[['concept_code', 'concept_name']]
     df = df.rename(columns={'concept_code': 'id', 'concept_name': 'name'})
