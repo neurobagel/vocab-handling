@@ -18,7 +18,10 @@ log = logging.getLogger("generate_vocab")
 # 432586 - "Mental disorder"
 # 376106 - "Disorder of the central nervous system"
 # 435524 - "Sleep disorder"
-DIAGNOSIS_PARENT_CONCEPTS = [432586, 376106, 435524]
+# 4011630 - "Neurological finding" - we are adding this to include a number of DX used in OpenNeuro datasets.
+# However 3 DX in OpenNeuro are still not in this list: "Aneurysm", "Overweight", and "Visual impairment"
+# See this issue comment for details: https://github.com/neurobagel/planning/issues/52#issuecomment-1790795307
+DIAGNOSIS_PARENT_CONCEPTS = [432586, 376106, 435524, 4011630]
 # 4157120 - "Assessment scales"
 ASSESSMENT_PARENT_CONCEPTS = [4157120]
 # Preamble for the vocabularies
